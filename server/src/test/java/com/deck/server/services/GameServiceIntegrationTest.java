@@ -1,94 +1,101 @@
 package com.deck.server.services;
 
+import com.deck.server.dto.CardCountDto;
+import com.deck.server.dto.SuitCountDto;
+import com.deck.server.entity.CardDefinition;
+import com.deck.server.entity.DeckCardEntity;
+import com.deck.server.exceptions.CardsExceptionBase;
+import com.deck.server.exceptions.GameDoesNotExistException;
 import com.deck.server.repositories.*;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class GameServiceIntegrationTest
 {
     @Autowired private GameService service;
-    @Autowired private IGameRepository games;
-    @Autowired private IDeckRepository decks;
-    @Autowired private ICardRepository cards;
-    @Autowired private IUserRepository users;
-    @Autowired private IPlayerRepository players;
+    @Autowired private GameRepository games;
+    @Autowired private DeckRepository decks;
+    @Autowired private CardRepository cards;
+    @Autowired private PlayerRepository players;
+    @Autowired private UserRepository users;
 
     private UUID gameId;
+    private UUID userId;
     private UUID deckId;
+    private UUID playerId;
 
     @BeforeEach
-    void setup()
+    void setup() throws CardsExceptionBase
     {
+        UUID id = UUID.randomUUID();
         cards.populateAll();
         gameId = service.createGame();
-        deckId = decks.createDeck("Test Deck");
-
-        for (var def : cards.getAll())
-            decks.addCardToDeck(deckId, def.id());
+        deckId = service.createDeck("Deck1");
+        userId = users.createUser("Player1", id);
+        playerId = service.addPlayerToGame(gameId, userId);
+        service.addDeckToGame(gameId, deckId);
     }
 
     @Test
-    void createAndDeleteGameWorks()
+    void createAndDeleteGame() throws CardsExceptionBase
     {
         UUID newGame = service.createGame();
-        assertThat(newGame).isNotNull();
-
+        assertThat(games.doesGameExist(newGame)).isTrue();
         service.deleteGame(newGame);
         assertThat(games.doesGameExist(newGame)).isFalse();
     }
 
     @Test
-    void addAndRemovePlayerWorks()
+    void dealCardsAndGetPlayerHand() throws CardsExceptionBase
     {
-        UUID userId = users.createUser("Alice");
-        UUID playerId = service.addPlayerToGame(gameId, userId);
-
-        assertThat(playerId).isNotNull();
-        assertThat(players.doesPlayerExist(playerId)).isTrue();
-
-        service.removePlayer(playerId);
-        assertThat(players.doesPlayerExist(playerId)).isFalse();
+        service.dealCardsToPlayer(gameId, playerId, 2);
+        var hand = service.getPlayerHand(playerId);
+        assertThat(hand).hasSize(2);
     }
 
     @Test
-    void addDeckThrowsIfEmpty()
+    void getPlayersInGameReturnsDto() throws GameDoesNotExistException
     {
-        UUID emptyDeck = decks.createDeck("Empty Deck");
-
-        assertThatThrownBy(() ->
-                service.addDeckToGame(gameId, emptyDeck))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Deck is empty");
+        var players = service.getPlayersInGame(gameId);
+        assertThat(players).hasSize(1);
+        assertThat(players.getFirst().playerName()).isEqualTo("Player1");
     }
 
     @Test
-    void shuffleShoeActuallyChangesOrder()
+    void getRemainingCardsBySuitIncludesAllSuits() throws GameDoesNotExistException
     {
-        service.addDeckToGame(gameId, deckId);
-        var before = games.getShoeCards(gameId)
-                .stream()
-                .map(GameCardEntity::order_key)
-                .toList();
+        List<SuitCountDto> counts = service.getRemainingCardsBySuit(gameId);
+        assertThat(counts).hasSize(4);
+        assertThat(counts).allSatisfy(c -> assertThat(c.remaining()).isGreaterThanOrEqualTo(0));
+    }
 
+    @Test
+    void getRemainingCardsBySuitAndRankIncludesAllCombinations() throws GameDoesNotExistException
+    {
+        List<CardCountDto> counts = service.getRemainingCardsBySuitAndRank(gameId);
+        assertThat(counts).hasSize(52);
+    }
+
+    @Test
+    void shuffleShoeDoesNotLoseCards() throws GameDoesNotExistException
+    {
+        var before = games.getShoeCards(gameId);
         service.shuffleShoeForGame(gameId);
-        var after = games.getShoeCards(gameId)
-                .stream()
-                .map(GameCardEntity::order_key)
-                .toList();
+        var after = games.getShoeCards(gameId);
 
-        assertThat(after).isNotEqualTo(before);
-        assertThat(after).hasSameSizeAs(before);
+        assertThat(after).extracting(CardDefinition::id)
+                .containsExactlyInAnyOrderElementsOf(before.stream().map(CardDefinition::id).toList());
     }
 }

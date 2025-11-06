@@ -78,10 +78,10 @@ public class PlayerRepository implements IPlayerRepository
             FROM hand_card h
             JOIN deck_card d ON d.id = h.card_id
             JOIN card_definition def ON def.id = d.card_def_id
-            WHERE h.player_id = ?
+            WHERE h.player_id = :playerId
             ORDER BY h.hand_order
        """)
-                .param(playerId)
+                .param("playerId", playerId)
                 .query((rs, rowNum) -> new CardDefinition(
                         rs.getShort("id"),
                         Suit.fromShort(rs.getShort("suit")),

@@ -17,9 +17,8 @@ public class UserRepository implements IUserRepository
     }
 
     @Override
-    public UUID createUser(String name)
+    public UUID createUser(String name, UUID id)
     {
-        UUID id = UUID.randomUUID();
         db.sql("INSERT INTO app_user(id, name) VALUES (:id, :name)")
                 .param("id", id)
                 .param("name", name)

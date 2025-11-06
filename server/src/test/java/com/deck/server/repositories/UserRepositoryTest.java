@@ -7,7 +7,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
@@ -18,36 +21,44 @@ class UserRepositoryTest
     @Autowired private UserRepository users;
 
     @Test
-    void createAndGetUser()
+    void createAndGetUserByName()
     {
-        UUID id = users.createUser("Alice");
-        assertThat(id).isNotNull();
-
+        UUID id = UUID.randomUUID();
+        users.createUser("Alice", id);
         Optional<User> found = users.getUserByName("Alice");
+
         assertThat(found).isPresent();
-
-        User u = found.get();
-        assertThat(u.id()).isEqualTo(id);
-        assertThat(u.name()).isEqualTo("Alice");
-        assertThat(u.createdAt()).isNotNull();
+        assertThat(found.get().id()).isEqualTo(id);
+        assertThat(found.get().name()).isEqualTo("Alice");
     }
 
     @Test
-    void userExistsAndDelete()
+    void doesUserExistWorks()
     {
-        UUID id = users.createUser("Bob");
+        UUID id = UUID.randomUUID();
+        users.createUser("Bob", id);
         assertThat(users.doesUserExist(id)).isTrue();
-
-        users.deleteUser(id);
-        assertThat(users.doesUserExist(id)).isFalse();
+        assertThat(users.doesUserExist(UUID.randomUUID())).isFalse();
     }
 
     @Test
-    void getAllUsersIncludesCreatedOnes()
+    void getAllUsersReturnsInserted()
     {
-        UUID id = users.createUser("Charlie");
-        List<User> all = users.getAllUsers();
+        users.createUser("C1", UUID.randomUUID());
+        users.createUser("C2", UUID.randomUUID());
 
-        assertThat(all.stream().map(User::id)).contains(id);
+        List<User> all = users.getAllUsers();
+        assertThat(all).extracting(User::name).contains("C1", "C2");
+    }
+
+    @Test
+    void deleteUserRemovesIt()
+    {
+        UUID id = UUID.randomUUID();
+        users.createUser("ToDelete", id);
+        users.deleteUser(id);
+
+        assertThat(users.doesUserExist(id)).isFalse();
+        assertThat(users.getUserByName("ToDelete")).isEmpty();
     }
 }

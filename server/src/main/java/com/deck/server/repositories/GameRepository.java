@@ -103,7 +103,7 @@ public class GameRepository implements IGameRepository
             JOIN deck_card d ON d.id = s.card_id
             WHERE s.game_id = :gameId
             ORDER BY s.order_key
-            LIMIT : count
+            LIMIT :count
         """)
                 .param("gameId", gameId)
                 .param("count", count)
@@ -195,7 +195,7 @@ public class GameRepository implements IGameRepository
 
             // move A to B’s old slot
             db.sql("""
-            UPDATE shoe_car
+            UPDATE shoe_card
                              SET order_key = :orderJ
             WHERE game_id = :gameId AND card_id = :cardI
             """)

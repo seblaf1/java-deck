@@ -63,7 +63,7 @@ public class GameService
         if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
 
         if (!userRepository.doesUserExist(userId))
-            userRepository.createUser("placeholder name");
+            userRepository.createUser("placeholder name", userId);
 
         return playerRepository.addPlayerToGame(gameId, userId);
     }

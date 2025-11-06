@@ -2,93 +2,111 @@ package com.deck.server.repositories;
 
 import com.deck.server.entity.DeckCardEntity;
 import com.deck.server.entity.DeckEntity;
-import org.junit.jupiter.api.*;
+import com.deck.server.entity.CardDefinition;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Transactional
 class DeckRepositoryTest
 {
-    @Autowired private CardRepository cards;
     @Autowired private DeckRepository decks;
+    @Autowired private CardRepository cards;
+
     private UUID deckId;
-    private short cardDefId;
+    private List<CardDefinition> defs;
 
     @BeforeEach
     void setup()
     {
+        // Ensure we have standard card definitions
         cards.populateAll();
-        deckId = decks.createDeck("test deck");  // ✅ valid FK
-        cardDefId = ((Number) cards.getAll().getFirst().id()).shortValue();
+        defs = cards.getAll();
+        assertThat(defs).isNotEmpty();
+
+        deckId = decks.createDeck("Test Deck");
+        assertThat(deckId).isNotNull();
     }
 
     @Test
-    void createDeckWorks()
+    void createAndFetchDeck_ShouldPersistAndRetrieve()
     {
-        assertThat(deckId).isNotNull();
+        Optional<DeckEntity> result = decks.getDeckById(deckId);
+        assertThat(result).isPresent();
 
-        Optional<DeckEntity> found = decks.getDeckById(deckId);
-        assertThat(found).isPresent();
-
-        DeckEntity deck = found.get();
+        DeckEntity deck = result.get();
         assertThat(deck.id()).isEqualTo(deckId);
         assertThat(deck.name()).isEqualTo("Test Deck");
         assertThat(deck.createdAt()).isNotNull();
     }
 
     @Test
-    void listDecksIncludesNewDeck()
+    void getAllDecks_ShouldIncludeCreatedDeck()
     {
         List<DeckEntity> all = decks.getAllDecks();
-        List<UUID> ids = all.stream().map(DeckEntity::id).toList();
-
-        assertThat(ids).contains(deckId);
+        assertThat(all).extracting(DeckEntity::id).contains(deckId);
     }
 
     @Test
-    void deleteDeckWorks()
+    void addAndRemoveCards_ShouldReflectInQueries()
     {
-        decks.deleteDeck(deckId);
-        assertThat(decks.getDeckById(deckId)).isEmpty();
-    }
+        short defId = defs.get(0).id(); // ✅ Use existing card definition ID
+        UUID deckCardId = decks.addCardToDeck(deckId, defId);
+        assertThat(deckCardId).isNotNull();
 
-    @Test
-    void addAndCountCards()
-    {
-        UUID id = decks.addCardToDeck(deckId, cardDefId);
-        assertThat(id).isNotNull();
+        List<DeckCardEntity> cardsInDeck = decks.getCardsInDeck(deckId);
+        assertThat(cardsInDeck).hasSize(1);
+        assertThat(cardsInDeck.get(0).card_def_id()).isEqualTo(defId);
 
         int count = decks.countCardsInDeck(deckId);
         assertThat(count).isEqualTo(1);
-    }
 
-    @Test
-    void getAndRemoveCards()
-    {
-        UUID id = decks.addCardToDeck(deckId, cardDefId);
-
-        List<DeckCardEntity> inDeck = decks.getCardsInDeck(deckId);
-        assertThat(inDeck).hasSize(1);
-        assertThat(inDeck.getFirst().deck_id()).isEqualTo(deckId);
-        assertThat(inDeck.getFirst().card_def_id()).isEqualTo(cardDefId);
-
-        decks.removeCardFromDeck(id);
+        decks.removeCardFromDeck(deckCardId);
         assertThat(decks.countCardsInDeck(deckId)).isZero();
     }
 
     @Test
-    void clearDeck()
+    void clearAllCardsFromDeck_ShouldRemoveAllCards()
     {
-        decks.addCardToDeck(deckId, cardDefId);
-        decks.addCardToDeck(deckId, cardDefId);
+        short defId1 = defs.get(0).id();
+        short defId2 = defs.get(1).id();
+        decks.addCardToDeck(deckId, defId1);
+        decks.addCardToDeck(deckId, defId2);
+
+        assertThat(decks.countCardsInDeck(deckId)).isEqualTo(2);
+
         decks.clearAllCardsFromDeck(deckId);
-
         assertThat(decks.countCardsInDeck(deckId)).isZero();
+    }
+
+    @Test
+    void doesDeckExist_ShouldReturnTrueForExistingDeck()
+    {
+        assertThat(decks.doesDeckExist(deckId)).isTrue();
+        assertThat(decks.doesDeckExist(UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void isDeckInUse_ShouldBeFalseForFreshDeck()
+    {
+        assertThat(decks.isDeckInUse(deckId)).isFalse();
+    }
+
+    @Test
+    void deleteDeck_ShouldRemoveDeck()
+    {
+        decks.deleteDeck(deckId);
+        assertThat(decks.doesDeckExist(deckId)).isFalse();
     }
 }

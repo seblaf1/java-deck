@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public interface IUserRepository
 {
-    UUID createUser(String name);
+    UUID createUser(String name, UUID id);
     Optional<User> getUserByName(String name);
     boolean doesUserExist(UUID userId);
     void deleteUser(UUID userId);

@@ -31,7 +31,9 @@ public class PlayerService
     public UUID createUser(String name) throws UserAlreadyExistsException
     {
         if (userRepository.getUserByName(name).isPresent()) throw new UserAlreadyExistsException(name);
-        return userRepository.createUser(name);
+
+        UUID id = UUID.randomUUID();
+        return userRepository.createUser(name, id);
     }
 
     public List<CardDto> getCardsForPlayer(UUID playerId) throws PlayerDoesNotExistException
