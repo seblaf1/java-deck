@@ -1,6 +1,6 @@
-package com.deck.server.messages;
+package com.deck.server.message;
 
-import com.deck.server.messages.dto.CardDTO;
+import com.deck.server.message.dto.CardDTO;
 
 import java.util.List;
 import java.util.UUID;

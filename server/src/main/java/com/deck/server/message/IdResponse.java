@@ -1,4 +1,4 @@
-package com.deck.server.messages;
+package com.deck.server.message;
 
 import java.util.UUID;
 

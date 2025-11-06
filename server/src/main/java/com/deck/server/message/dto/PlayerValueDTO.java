@@ -1,4 +1,4 @@
-package com.deck.server.messages.dto;
+package com.deck.server.message.dto;
 
 import java.util.UUID;
 

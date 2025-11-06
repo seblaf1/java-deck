@@ -1,5 +1,6 @@
 package com.deck.server.repositories;
 
+import com.deck.server.entity.DeckEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -25,26 +26,32 @@ public class DeckRepository
         return id;
     }
 
-    public Optional<Map<String, Object>> getDeckById(UUID deckId)
+    public Optional<DeckEntity> getDeckById(UUID deckId)
     {
-        return db.sql("SELECT id, name, created_at FROM deck WHERE id=:id")
+        return db.sql("SELECT id, name, created_at FROM deck WHERE id = :id")
                 .param("id", deckId)
-                .query()
-                .listOfRows()
-                .stream()
-                .findFirst();
+                .query((rs, rowNum) -> new DeckEntity(
+                        (UUID) rs.getObject("id"),
+                        rs.getString("name"),
+                        rs.getObject("created_at", java.time.OffsetDateTime.class)
+                ))
+                .optional();
     }
 
-    public List<Map<String, Object>> getAllDecks()
+    public List<DeckEntity> getAllDecks()
     {
         return db.sql("SELECT id, name, created_at FROM deck ORDER BY created_at")
-                .query()
-                .listOfRows();
+                .query((rs, rowNum) -> new DeckEntity(
+                        (UUID) rs.getObject("id"),
+                        rs.getString("name"),
+                        rs.getObject("created_at", java.time.OffsetDateTime.class)
+                ))
+                .list();
     }
 
     public void renameDeck(UUID deckId, String newName)
     {
-        db.sql("UPDATE deck SET name=:name WHERE id=:id")
+        db.sql("UPDATE deck SET name = :name WHERE id = :id")
                 .param("id", deckId)
                 .param("name", newName)
                 .update();
@@ -52,7 +59,7 @@ public class DeckRepository
 
     public void deleteDeck(UUID deckId)
     {
-        db.sql("DELETE FROM deck WHERE id=:id")
+        db.sql("DELETE FROM deck WHERE id = :id")
                 .param("id", deckId)
                 .update();
     }

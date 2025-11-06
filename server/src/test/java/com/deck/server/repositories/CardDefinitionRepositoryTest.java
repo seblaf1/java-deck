@@ -1,5 +1,8 @@
 package com.deck.server.repositories;
 
+import com.deck.server.entity.CardDefinition;
+import com.deck.server.entity.Rank;
+import com.deck.server.entity.Suit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,27 +16,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-class CardDefinitionRepositoryTest {
-
+class CardDefinitionRepositoryTest
+{
     @Autowired private CardDefinitionRepository cards;
 
     @Test
-    void populateAndReadCards() {
+    void populateAndReadCards()
+    {
         cards.populateAll();
-        List<Map<String, Object>> all = cards.getAll();
+        List<CardDefinition> all = cards.getAll();
 
         assertThat(all).hasSize(52);
-        assertThat(all.getFirst()).containsKeys("id", "suit", "rank");
+
+        CardDefinition first = all.getFirst();
+        assertThat(first.suit()).isInstanceOf(Suit.class);
+        assertThat(first.rank()).isInstanceOf(Rank.class);
+        assertThat(first.rank().toShort()).isBetween((short)1, (short)13);
     }
 
     @Test
-    void getByIdWorks() {
+    void getByIdWorks()
+    {
         cards.populateAll();
-        short firstId = ((Number) cards.getAll().getFirst().get("id")).shortValue();
+        short firstId = cards.getAll().getFirst().id();
 
-        Optional<Map<String, Object>> found = cards.getById(firstId);
+        Optional<CardDefinition> found = cards.getById(firstId);
         assertThat(found).isPresent();
-        assertThat(((Number) found.get().get("id")).intValue())
-                .isEqualTo(firstId);
+        assertThat(found.get().id()).isEqualTo(firstId);
     }
 }

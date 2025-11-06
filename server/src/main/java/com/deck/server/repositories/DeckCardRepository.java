@@ -1,5 +1,6 @@
 package com.deck.server.repositories;
 
+import com.deck.server.entity.DeckCardEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import java.util.*;
@@ -24,17 +25,20 @@ public class DeckCardRepository
         return id;
     }
 
-    public List<Map<String, Object>> getCardsInDeck(UUID deckId)
+    public List<DeckCardEntity> getCardsInDeck(UUID deckId)
     {
         return db.sql("""
-            SELECT dc.id, dc.card_def_id, cd.suit, cd.rank
+            SELECT dc.id, dc.deck_id, dc.card_def_id
             FROM deck_card dc
-            JOIN card_definition cd ON cd.id = dc.card_def_id
-            WHERE deck_id = :deckId
+            WHERE dc.deck_id = :deckId
             """)
                 .param("deckId", deckId)
-                .query()
-                .listOfRows();
+                .query((rs, rowNum) -> new DeckCardEntity(
+                        rs.getObject("id", UUID.class),
+                        rs.getObject("deck_id", UUID.class),
+                        rs.getShort("card_def_id")
+                ))
+                .list();
     }
 
     public void removeCardFromDeck(UUID deckCardId)

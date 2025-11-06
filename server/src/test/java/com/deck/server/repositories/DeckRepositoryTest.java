@@ -1,12 +1,12 @@
 package com.deck.server.repositories;
 
+import com.deck.server.entity.DeckEntity;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.*;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
@@ -14,10 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DeckRepositoryTest
 {
-
     @Autowired private DeckRepository decks;
-
-    UUID deckId;
+    private UUID deckId;
 
     @BeforeEach
     void setup()
@@ -31,13 +29,13 @@ class DeckRepositoryTest
     {
         assertThat(deckId).isNotNull();
 
-        var found = decks.getDeckById(deckId);
+        Optional<DeckEntity> found = decks.getDeckById(deckId);
         assertThat(found).isPresent();
 
-        var deck = found.get();
-        assertThat(deck.get("id")).isEqualTo(deckId);
-        assertThat(deck.get("name")).isEqualTo("Test Deck");
-        assertThat(deck.get("created_at")).isNotNull();
+        DeckEntity deck = found.get();
+        assertThat(deck.id()).isEqualTo(deckId);
+        assertThat(deck.name()).isEqualTo("Test Deck");
+        assertThat(deck.createdAt()).isNotNull();
     }
 
     @Test
@@ -46,16 +44,16 @@ class DeckRepositoryTest
     {
         decks.renameDeck(deckId, "Renamed Deck");
 
-        var deck = decks.getDeckById(deckId).orElseThrow();
-        assertThat(deck.get("name")).isEqualTo("Renamed Deck");
+        DeckEntity deck = decks.getDeckById(deckId).orElseThrow();
+        assertThat(deck.name()).isEqualTo("Renamed Deck");
     }
 
     @Test
     @Order(3)
     void listDecksIncludesNewDeck()
     {
-        var all = decks.getAllDecks();
-        var ids = all.stream().map(m -> (UUID)m.get("id")).toList();
+        List<DeckEntity> all = decks.getAllDecks();
+        List<UUID> ids = all.stream().map(DeckEntity::id).toList();
 
         assertThat(ids).contains(deckId);
     }

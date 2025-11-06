@@ -1,5 +1,8 @@
 package com.deck.server.repositories;
 
+import com.deck.server.entity.CardDefinition;
+import com.deck.server.entity.Rank;
+import com.deck.server.entity.Suit;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import java.util.*;
@@ -12,37 +15,42 @@ public class CardDefinitionRepository
 
     public void populateAll()
     {
-        // 52 cards (suit 0–3, rank 1–13)
-        for (int suit = 0; suit < 4; suit++)
+        for (Suit suit : Suit.values())
         {
-            for (int rank = 1; rank <= 13; rank++)
+            for (Rank rank : Rank.values())
             {
                 db.sql("""
                     INSERT INTO card_definition(suit, rank)
                     VALUES (:suit, :rank)
                     ON CONFLICT (suit, rank) DO NOTHING
                     """)
-                        .param("suit", suit)
-                        .param("rank", rank)
+                        .param("suit", suit.toShort())
+                        .param("rank", rank.toShort())
                         .update();
             }
         }
     }
 
-    public List<Map<String, Object>> getAll()
+    public List<CardDefinition> getAll()
     {
         return db.sql("SELECT id, suit, rank FROM card_definition ORDER BY suit, rank")
-                .query()
-                .listOfRows();
+                .query((rs, rowNum) -> new CardDefinition(
+                        rs.getShort("id"),
+                        Suit.fromShort(rs.getShort("suit")),
+                        Rank.fromShort(rs.getShort("rank"))
+                ))
+                .list();
     }
 
-    public Optional<Map<String, Object>> getById(short id)
+    public Optional<CardDefinition> getById(short id)
     {
         return db.sql("SELECT id, suit, rank FROM card_definition WHERE id=:id")
                 .param("id", id)
-                .query()
-                .listOfRows()
-                .stream()
-                .findFirst();
+                .query((rs, rowNum) -> new CardDefinition(
+                        rs.getShort("id"),
+                        Suit.fromShort(rs.getShort("suit")),
+                        Rank.fromShort(rs.getShort("rank"))
+                ))
+                .optional();
     }
 }

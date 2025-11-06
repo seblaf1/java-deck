@@ -1,5 +1,6 @@
 package com.deck.server.repositories;
 
+import com.deck.server.entity.PlayerEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-class PlayerRepositoryTest {
-
+class PlayerRepositoryTest
+{
     @Autowired private GameRepository games;
     @Autowired private UserRepository users;
     @Autowired private PlayerRepository players;
@@ -23,13 +24,15 @@ class PlayerRepositoryTest {
     private UUID userId;
 
     @BeforeEach
-    void setup() {
+    void setup()
+    {
         gameId = games.createGame();
         userId = users.createUser("Charlie");
     }
 
     @Test
-    void addAndRemovePlayer() {
+    void addAndRemovePlayer()
+    {
         UUID playerId = players.addPlayerToGame(gameId, userId);
         assertThat(playerId).isNotNull();
         assertThat(players.doesPlayerExist(playerId)).isTrue();
@@ -39,11 +42,17 @@ class PlayerRepositoryTest {
     }
 
     @Test
-    void getPlayersInGame() {
+    void getPlayersInGame()
+    {
         players.addPlayerToGame(gameId, userId);
-        List<Map<String, Object>> list = players.getAllPlayersInGame(gameId);
+        List<PlayerEntity> list = players.getAllPlayersInGame(gameId);
 
         assertThat(list).hasSize(1);
-        assertThat(list.getFirst().get("name")).isEqualTo("Charlie");
+
+        PlayerEntity p = list.getFirst();
+        assertThat(p.userName()).isEqualTo("Charlie");
+        assertThat(p.userId()).isEqualTo(userId);
+        assertThat(p.gameId()).isEqualTo(gameId);
+        assertThat(p.addedAt()).isNotNull();
     }
 }

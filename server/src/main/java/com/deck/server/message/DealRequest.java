@@ -1,3 +1,3 @@
-package com.deck.server.messages;
+package com.deck.server.message;
 
 public record DealRequest(int count) {}

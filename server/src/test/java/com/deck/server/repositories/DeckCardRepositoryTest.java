@@ -1,5 +1,6 @@
 package com.deck.server.repositories;
 
+import com.deck.server.entity.DeckCardEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-class DeckCardRepositoryTest {
-
+class DeckCardRepositoryTest
+{
     @Autowired private CardDefinitionRepository cards;
     @Autowired private DeckCardRepository deckCards;
     @Autowired private DeckRepository decks;
@@ -23,14 +24,16 @@ class DeckCardRepositoryTest {
     private short cardDefId;
 
     @BeforeEach
-    void setup() {
+    void setup()
+    {
         cards.populateAll();
         deckId = decks.createDeck("test deck");  // ✅ valid FK
-        cardDefId = ((Number) cards.getAll().getFirst().get("id")).shortValue();
+        cardDefId = ((Number) cards.getAll().getFirst().id()).shortValue();
     }
 
     @Test
-    void addAndCountCards() {
+    void addAndCountCards()
+    {
         UUID id = deckCards.addCardToDeck(deckId, cardDefId);
         assertThat(id).isNotNull();
 
@@ -39,18 +42,22 @@ class DeckCardRepositoryTest {
     }
 
     @Test
-    void getAndRemoveCards() {
+    void getAndRemoveCards()
+    {
         UUID id = deckCards.addCardToDeck(deckId, cardDefId);
 
-        List<Map<String, Object>> inDeck = deckCards.getCardsInDeck(deckId);
+        List<DeckCardEntity> inDeck = deckCards.getCardsInDeck(deckId);
         assertThat(inDeck).hasSize(1);
+        assertThat(inDeck.getFirst().deck_id()).isEqualTo(deckId);
+        assertThat(inDeck.getFirst().card_def_id()).isEqualTo(cardDefId);
 
         deckCards.removeCardFromDeck(id);
         assertThat(deckCards.countCardsInDeck(deckId)).isZero();
     }
 
     @Test
-    void clearDeck() {
+    void clearDeck()
+    {
         deckCards.addCardToDeck(deckId, cardDefId);
         deckCards.addCardToDeck(deckId, cardDefId);
         deckCards.clearAllCardsFromDeck(deckId);
