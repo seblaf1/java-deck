@@ -134,14 +134,17 @@ public class GameRepository implements IGameRepository
     @Transactional
     public void shuffleShoe(UUID gameId)
     {
+        // Defer the constraint (good practice)
+        db.sql("SET CONSTRAINTS uq_shoe_order DEFERRED").update();
+
         var cards = db.sql("""
-            SELECT card_id, order_key
-            FROM shoe_card
-            WHERE game_id = :gameId
-            ORDER BY order_key
-            """)
+        SELECT card_id, order_key
+        FROM shoe_card
+        WHERE game_id = :gameId
+        ORDER BY order_key
+        """)
                 .param("gameId", gameId)
-                .query((rs, rowNum) -> new Object[] {
+                .query((rs, rowNum) -> new Object[]{
                         rs.getObject("card_id", UUID.class),
                         rs.getLong("order_key")
                 })
@@ -151,62 +154,45 @@ public class GameRepository implements IGameRepository
         if (n <= 1)
             return;
 
-        Random rng = new Random();
+        // 1️⃣ First, move all cards to a temporary safe range.
+        long tempBase = 1_000_000_000L;
+        for (int i = 0; i < n; i++)
+        {
+            UUID cardId = (UUID) cards.get(i)[0];
+            db.sql("""
+            UPDATE shoe_card
+            SET order_key = :temp
+            WHERE game_id = :gameId AND card_id = :cardId
+            """)
+                    .param("temp", tempBase + i)
+                    .param("gameId", gameId)
+                    .param("cardId", cardId)
+                    .update();
+        }
 
+        // 2️⃣ Shuffle in memory
+        Random rng = new Random();
         for (int i = n - 1; i > 0; i--)
         {
             int j = rng.nextInt(i + 1);
-            if (i == j) continue;
+            var tmp = cards.get(i);
+            cards.set(i, cards.get(j));
+            cards.set(j, tmp);
+        }
 
-            var cardI = (UUID) cards.get(i)[0];
-            long orderI = (long) cards.get(i)[1];
-
-            var cardJ = (UUID) cards.get(j)[0];
-            long orderJ = (long) cards.get(j)[1];
-
-            // swap their order_keys atomically using the same safe temp slot method
-            long tempKey = orderI + 10_000_000L;
-
-            // move A to temp
-            db.sql(
-                            """
-            UPDATE
-                            shoe_card
-                                        SET order_key = :temp
-            WHERE
-                            game_id = :gameId AND card_id = :cardI
-            """)
-                    .param("temp", tempKey)
-                    .param("gameId", gameId)
-                    .param("cardI", cardI)
-                    .update();
-                            // move B to A’s original slot
-            db.sql("""
-            UPDATE
-                            shoe_card
-            SET order_key = :orderI
-                                        WHERE game_id = :gameId AND card_id = :cardJ
-            """)
-                    .param("orderI", orderI)
-                    .param("gameId", gameId)
-                    .param("cardJ", cardJ)
-                    .
-                            update();
-
-            // move A to B’s old slot
+        // 3️⃣ Reassign fresh sequential order keys (no collisions possible)
+        for (int i = 0; i < n; i++)
+        {
+            UUID cardId = (UUID) cards.get(i)[0];
             db.sql("""
             UPDATE shoe_card
-                             SET order_key = :orderJ
-            WHERE game_id = :gameId AND card_id = :cardI
+            SET order_key = :newKey
+            WHERE game_id = :gameId AND card_id = :cardId
             """)
-                    .param("orderJ", orderJ)
+                    .param("newKey", i)
                     .param("gameId", gameId)
-                    .param("cardI", cardI)
+                    .param("cardId", cardId)
                     .update();
-
-            // maintain in-memory list consistency for next swaps
-            cards.set(i, new Object[] { cardJ, orderJ });
-            cards.set(j, new Object[] { cardI, orderI });
         }
     }
 

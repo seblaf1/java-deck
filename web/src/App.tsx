@@ -7,6 +7,7 @@ type SuitCountDto = { suit: string; remaining: number }
 type CardCountDto = { suit: number; rank: number; count: number }
 
 const SUITS = ['♥', '♠', '♣', '♦']
+const SUIT_NAMES = ['hearts', 'spades', 'clubs', 'diamonds']
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 
 export default function App() {
@@ -20,8 +21,8 @@ export default function App() {
   const [newPlayerName, setNewPlayerName] = useState('')
   const [isAddingDeck, setIsAddingDeck] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [isConnectionLost, setIsConnectionLost] = useState(false)
 
-  // --- helpers
   const api = async (path: string, opts?: RequestInit) => {
     const res = await fetch(`/api${path}`, opts)
     if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`)
@@ -47,8 +48,7 @@ export default function App() {
     try {
       await api('/games', { method: 'POST' })
       await refreshGames()
-    } catch (err) {
-      console.error(err)
+    } catch {
       showError('Failed to create game.')
     }
   }
@@ -59,20 +59,18 @@ export default function App() {
       await api(`/games/${id}`, { method: 'DELETE' })
       setSelectedGame(null)
       await refreshGames()
-    } catch (err) {
-      console.error(err)
+    } catch {
       showError('Failed to delete game.')
     }
   }
 
-  const shuffleGame = async () => {
+  const shuffleShoe = async () => {
     if (!selectedGame) return
     try {
       await api(`/games/${selectedGame.id}/shuffle`, { method: 'POST' })
       await fullRefresh()
-    } catch (err) {
-      console.error(err)
-      showError('Shuffle failed.')
+    } catch {
+      showError('Failed to shuffle shoe.')
     }
   }
 
@@ -83,19 +81,17 @@ export default function App() {
       await api(`/games/${selectedGame.id}/join?playerName=${encoded}`, { method: 'POST' })
       setNewPlayerName('')
       await fullRefresh()
-    } catch (err) {
-      console.error(err)
+    } catch {
       showError('Failed to add player.')
     }
   }
 
-  const leavePlayer = async (playerId: string) => {
+  const kickPlayer = async (playerId: string) => {
     try {
       await api(`/players/${playerId}/leave`, { method: 'DELETE' })
       await fullRefresh()
-    } catch (err) {
-      console.error(err)
-      showError('Failed to remove player.')
+    } catch {
+      showError('Failed to kick player.')
     }
   }
 
@@ -106,8 +102,7 @@ export default function App() {
       const deckId: string = await api('/games/new-deck', { method: 'POST' }).then(r => r.json())
       await api(`/games/${selectedGame.id}/decks/${deckId}`, { method: 'POST' })
       await fullRefresh()
-    } catch (err) {
-      console.error(err)
+    } catch {
       showError('Failed to create or add deck.')
     } finally {
       setIsAddingDeck(false)
@@ -119,8 +114,7 @@ export default function App() {
     try {
       await api(`/games/${selectedGame.id}/players/${playerId}/deal?count=1`, { method: 'POST' })
       await fullRefresh()
-    } catch (err) {
-      console.error(err)
+    } catch {
       showError('Failed to deal card.')
     }
   }
@@ -130,11 +124,8 @@ export default function App() {
     try {
       const data: PlayerDto[] = await api(`/games/${selectedGame.id}/players`).then(r => r.json())
       setPlayers(data)
-      for (const p of data) {
-        await loadPlayerCards(p.playerId)
-      }
-    } catch (err) {
-      console.error(err)
+      for (const p of data) await loadPlayerCards(p.playerId)
+    } catch {
       showError('Failed to load players.')
     }
   }
@@ -143,8 +134,7 @@ export default function App() {
     try {
       const data: CardDto[] = await api(`/players/${playerId}/hand`).then(r => r.json())
       setCards(prev => ({ ...prev, [playerId]: data }))
-    } catch (err) {
-      console.error(err)
+    } catch {
       showError('Failed to load hand.')
     }
   }
@@ -154,60 +144,88 @@ export default function App() {
     try {
       const [bySuit, bySuitRank] = await Promise.all([
         api(`/games/${selectedGame.id}/remaining-by-suit`).then(r => r.json()),
-        api(`/games/${selectedGame.id}/remaining-by-suit-rank`).then(r => r.json())
+        api(`/games/${selectedGame.id}/remaining-by-suit-rank`).then(r => r.json()),
       ])
       setSuits(bySuit)
       setSuitRanks(bySuitRank)
-    } catch (err) {
-      console.error(err)
-      showError('Failed to load remaining cards.')
+    } catch {
+      // Only polling failures show "Connection lost"
+      setIsConnectionLost(true)
     }
   }
 
   const fullRefresh = async () => {
-    await Promise.all([loadPlayers(), loadRemaining()])
+    try {
+      await Promise.all([loadPlayers(), loadRemaining()])
+      setIsConnectionLost(false)
+    } catch {
+      setIsConnectionLost(true)
+    }
   }
 
-  // Poll every 5 s for live updates
   useEffect(() => {
     let interval: any
     if (selectedGame) {
-      interval = setInterval(() => {
-        fullRefresh()
-      }, 5000)
+      interval = setInterval(fullRefresh, 5000)
       fullRefresh()
     }
     return () => clearInterval(interval)
   }, [selectedGame])
 
-  // Initial game list
   useEffect(() => {
     refreshGames()
   }, [])
+
+  const renderColoredCards = (hand: CardDto[]) => (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 4,
+        maxWidth: '100%',
+      }}
+    >
+      {hand.map((c, i) => {
+        const color = SUITS[c.suit] === '♥' || SUITS[c.suit] === '♦' ? 'red' : 'black'
+        return (
+          <span key={i} style={{ color }}>
+            {SUITS[c.suit]}
+            {RANKS[c.rank]}
+          </span>
+        )
+      })}
+    </div>
+  )
+
+  const totalCardsRemaining = suits.reduce((sum, s) => sum + s.remaining, 0)
 
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
       <h1>Card Game Dashboard</h1>
 
-      {errorMsg && (
+      {(errorMsg || isConnectionLost) && (
         <div
           style={{
-            background: '#fdd',
+            background: isConnectionLost ? '#fee' : '#fdd',
             color: '#900',
             padding: '8px 12px',
             borderRadius: 4,
             marginBottom: 12,
           }}
         >
-          {errorMsg}
+          {isConnectionLost ? 'Connection lost' : errorMsg}
         </div>
       )}
 
       <div style={{ marginBottom: 16 }}>
-        <button onClick={createGame}>Create Game</button>
-        <button onClick={refreshGames} style={{ marginLeft: 8 }}>
-          Refresh List
-        </button>
+        {!selectedGame && (
+          <>
+            <button onClick={createGame}>Create Game</button>
+            <button onClick={refreshGames} style={{ marginLeft: 8 }}>
+              Refresh List
+            </button>
+          </>
+        )}
         {loading && <span style={{ marginLeft: 8 }}>Loading...</span>}
       </div>
 
@@ -233,15 +251,17 @@ export default function App() {
       ) : (
         <>
           <h2>Game {selectedGame.id}</h2>
-          <button onClick={() => setSelectedGame(null)}>← Back</button>{' '}
-          <button onClick={shuffleGame}>Shuffle Deck</button>
+          <button onClick={() => setSelectedGame(null)}>← Back</button>
 
           <hr />
 
-          <h3>Deck</h3>
-          <button onClick={createAndAddDeck} disabled={isAddingDeck}>
-            {isAddingDeck ? 'Adding Deck...' : 'Add Deck'}
-          </button>
+          <h3>Shoe</h3>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={createAndAddDeck} disabled={isAddingDeck}>
+              {isAddingDeck ? 'Adding Deck...' : 'Add Deck'}
+            </button>
+            <button onClick={shuffleShoe}>Shuffle Shoe</button>
+          </div>
 
           <hr />
 
@@ -252,7 +272,16 @@ export default function App() {
               value={newPlayerName}
               onChange={e => setNewPlayerName(e.target.value)}
             />
-            <button onClick={addPlayerToGame}>Add Player</button>
+            <button
+              onClick={addPlayerToGame}
+              disabled={!newPlayerName.trim()}
+              style={{
+                opacity: !newPlayerName.trim() ? 0.5 : 1,
+                cursor: !newPlayerName.trim() ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Add Player
+            </button>
           </div>
 
           {players.length > 0 && (
@@ -272,21 +301,19 @@ export default function App() {
                     <tr key={p.playerId}>
                       <td>{p.playerName}</td>
                       <td>{p.totalValue}</td>
+                      <td>{hand.length > 0 ? renderColoredCards(hand) : '—'}</td>
                       <td>
-                        {hand.length > 0
-                          ? hand
-                              .map(
-                                c =>
-                                  `${SUITS[c.suit]}${
-                                    RANKS[c.rank]
-                                  }`
-                              )
-                              .join(' ')
-                          : '—'}
-                      </td>
-                      <td>
-                        <button onClick={() => dealCard(p.playerId)}>Deal 1</button>{' '}
-                        <button onClick={() => leavePlayer(p.playerId)}>Remove</button>
+                        <button
+                          onClick={() => dealCard(p.playerId)}
+                          disabled={totalCardsRemaining === 0}
+                          style={{
+                            opacity: totalCardsRemaining === 0 ? 0.5 : 1,
+                            cursor: totalCardsRemaining === 0 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          Deal 1
+                        </button>{' '}
+                        <button onClick={() => kickPlayer(p.playerId)}>Kick</button>
                       </td>
                     </tr>
                   )
@@ -299,7 +326,6 @@ export default function App() {
 
           <h3>Remaining Cards in Shoe</h3>
 
-          {/* Suit Summary Table */}
           <table
             border={1}
             cellPadding={6}
@@ -307,7 +333,7 @@ export default function App() {
               borderCollapse: 'collapse',
               marginBottom: 12,
               textAlign: 'center',
-              minWidth: '200px',
+              minWidth: '250px',
             }}
           >
             <thead>
@@ -328,15 +354,14 @@ export default function App() {
             </thead>
             <tbody>
               <tr>
-                {SUITS.map(s => {
-                  const item = suits.find(i => i.suit === s)
-                  return <td key={s}>{item ? item.remaining : 0}</td>
+                {SUIT_NAMES.map((sName, i) => {
+                  const match = suits.find(item => item.suit.toLowerCase() === sName)
+                  return <td key={i}>{match ? match.remaining : 0}</td>
                 })}
               </tr>
             </tbody>
           </table>
 
-          {/* Detailed Rank Table */}
           <table
             border={1}
             cellPadding={6}
@@ -350,6 +375,7 @@ export default function App() {
           >
             <thead>
               <tr>
+                <th style={{ width: 40 }}></th>
                 {RANKS.map(r => (
                   <th key={r} style={{ width: '2ch' }}>
                     {r}
@@ -360,6 +386,14 @@ export default function App() {
             <tbody>
               {SUITS.map((suit, sIdx) => (
                 <tr key={suit}>
+                  <td
+                    style={{
+                      color: suit === '♥' || suit === '♦' ? 'red' : 'black',
+                      fontSize: '18px',
+                    }}
+                  >
+                    {suit}
+                  </td>
                   {RANKS.map((_, rIdx) => {
                     const card = suitRanks.find(c => c.suit === sIdx && c.rank === rIdx)
                     const color = suit === '♥' || suit === '♦' ? 'red' : 'black'

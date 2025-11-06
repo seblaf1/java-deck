@@ -241,20 +241,20 @@ public class GameController
      * Shuffle the game deck (shoe)
      */
     @PostMapping("/{gameId}/shuffle")
-    public ResponseEntity<Void> shuffleShoe(@PathVariable UUID gameId)
+    public ResponseEntity<String> shuffleShoe(@PathVariable UUID gameId)
     {
         try
         {
             gameService.shuffleShoeForGame(gameId);
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok("");
         }
         catch (CardsExceptionBase ex)
         {
-            throw new ResponseStatusException(ex.code, ex.getMessage());
+            return ResponseEntity.status(ex.code).body(ex.getMessage());
         }
         catch (Exception ex)
         {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
         }
     }
 }

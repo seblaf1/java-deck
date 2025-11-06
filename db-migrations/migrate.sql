@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS shoe_card (
 
 -- === HANDS (DEALT CARDS) ===
 CREATE TABLE IF NOT EXISTS hand_card (
-    player_id    UUID NOT NULL REFERENCES player(id) ON DELETE RESTRICT,
+    player_id    UUID NOT NULL REFERENCES player(id) ON DELETE CASCADE,
     card_id      UUID NOT NULL REFERENCES deck_card(id) ON DELETE RESTRICT,
     dealt_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     hand_order   INTEGER,

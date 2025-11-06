@@ -49,20 +49,20 @@ public class PlayerController
      * Remove a player from their game.
      */
     @DeleteMapping("/{playerId}/leave")
-    public ResponseEntity<Void> removePlayer(@PathVariable UUID playerId)
+    public ResponseEntity<String> removePlayer(@PathVariable UUID playerId)
     {
         try
         {
             gameService.removePlayer(playerId);
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok("");
         }
         catch (CardsExceptionBase ex)
         {
-            throw new ResponseStatusException(ex.code, ex.getMessage());
+            return ResponseEntity.status(ex.code).body(ex.getMessage());
         }
         catch (Exception ex)
         {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
         }
     }
 
