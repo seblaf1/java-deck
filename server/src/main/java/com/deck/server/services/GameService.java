@@ -1,15 +1,12 @@
 package com.deck.server.services;
 
 import com.deck.server.dto.CardCountDto;
-import com.deck.server.entity.CardDefinition;
-import com.deck.server.entity.DeckCardEntity;
-import com.deck.server.entity.PlayerEntity;
-import com.deck.server.entity.Suit;
+import com.deck.server.dto.GameDto;
+import com.deck.server.entity.*;
 import com.deck.server.dto.PlayerDto;
 import com.deck.server.dto.SuitCountDto;
 import com.deck.server.exceptions.*;
 import com.deck.server.repositories.*;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
@@ -18,77 +15,90 @@ import java.util.stream.Collectors;
 @Service
 public class GameService
 {
-    private final ICardRepository _cardRepo;
-    private final IDeckRepository _deckRepo;
-    private final IPlayerRepository _playerRepo;
-    private final IGameRepository _gameRepo;
+    private final ICardRepository cardRepository;
+    private final IDeckRepository deckRepository;
+    private final IPlayerRepository playerRepository;
+    private final IGameRepository gameRepository;
+    private final UserRepository userRepository;
 
     public GameService(
-            ICardRepository cardRepo,
-            IDeckRepository deckRepo,
-            IPlayerRepository playerRepo,
-            IGameRepository gameRepo)
+            ICardRepository cardRepository,
+            IDeckRepository deckRepository,
+            IPlayerRepository playerRepository,
+            IGameRepository gameRepository, UserRepository userRepository)
     {
-        this._cardRepo = cardRepo;
-        this._deckRepo = deckRepo;
-        this._playerRepo = playerRepo;
-        this._gameRepo = gameRepo;
+        this.cardRepository = cardRepository;
+        this.deckRepository = deckRepository;
+        this.playerRepository = playerRepository;
+        this.gameRepository = gameRepository;
+        this.userRepository = userRepository;
     }
+
+    public List<GameDto> getAllGames()
+    {
+        return gameRepository.getAll()
+                .stream()
+                .map(entity -> new GameDto(entity.id(), entity.createdAt()))
+                .toList();
+    }
+
 
     @Transactional
     public UUID createGame() throws CardsExceptionBase
     {
-        return _gameRepo.createGame();
+        return gameRepository.createGame();
     }
 
     @Transactional
     public void deleteGame(UUID gameId) throws GameDoesNotExistException
     {
-        if (!_gameRepo.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
+        if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
 
-        _gameRepo.deleteGame(gameId);
+        gameRepository.deleteGame(gameId);
     }
 
     @Transactional
-    public UUID addPlayerToGame(UUID gameId, UUID userId) throws GameDoesNotExistException
+    public UUID addPlayerToGame(UUID gameId, UUID userId) throws CardsExceptionBase
     {
-        if (!_gameRepo.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
+        if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
 
-        // TODO: If user not exist, create
+        if (!userRepository.doesUserExist(userId))
+            userRepository.createUser("placeholder name");
 
-        return _playerRepo.addPlayerToGame(gameId, userId);
+        return playerRepository.addPlayerToGame(gameId, userId);
     }
 
     @Transactional
     public void removePlayer(UUID playerId) throws PlayerDoesNotExistException
     {
-        if (!_playerRepo.doesPlayerExist(playerId)) throw new PlayerDoesNotExistException(playerId);
+        if (!playerRepository.doesPlayerExist(playerId)) throw new PlayerDoesNotExistException(playerId);
 
-        _playerRepo.removePlayerFromGame(playerId);
+        playerRepository.removePlayerFromGame(playerId);
     }
 
     @Transactional
-    public void dealCardsToPlayer(UUID gameId, UUID playerId, int count) throws CustomException
+    public void dealCardsToPlayer(UUID gameId, UUID playerId, int count) throws CardsExceptionBase
     {
-        if (count <= 0) throw new CustomException("count must be positive", HttpStatus.BAD_REQUEST);
+        if (count <= 0) throw new CountMustBePositiveException(count);
+        if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
 
-        var cards = _gameRepo.popCardsFromShoe(gameId, count);
-        if (cards.isEmpty()) throw new CustomException("No cards remaining in shoe", HttpStatus.OK);
+        var cards = gameRepository.popCardsFromShoe(gameId, count);
+        if (cards.isEmpty()) return; // ok
 
-        _playerRepo.addCardsToPlayerHand(playerId, cards);
+        playerRepository.addCardsToPlayerHand(playerId, cards);
     }
 
     public List<PlayerDto> getPlayersInGame(UUID gameId) throws GameDoesNotExistException
     {
-        if (!_gameRepo.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
+        if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
 
-        var entities = _playerRepo.getAllPlayersInGame(gameId);
+        var entities = playerRepository.getAllPlayersInGame(gameId);
         List<PlayerDto> result = new ArrayList<>(entities.size());
 
         for (PlayerEntity player : entities)
         {
             UUID playerId = player.id();
-            List<CardDefinition> hand = _playerRepo.getHandForPlayer(playerId);
+            List<CardDefinition> hand = playerRepository.getHandForPlayer(playerId);
 
             int sum = 0;
             for (CardDefinition card : hand)
@@ -105,30 +115,31 @@ public class GameService
 
     public List<SuitCountDto> getRemainingCardsBySuit(UUID gameId) throws GameDoesNotExistException
     {
-        if (!_gameRepo.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
+        if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
 
-        var cards = _gameRepo.getShoeCards(gameId);
-        if (cards.isEmpty()) return List.of(); // TODO
+        var cards = gameRepository.getShoeCards(gameId);
 
         // Count per suit
         EnumMap<Suit, Integer> counts = new EnumMap<>(Suit.class);
         for (CardDefinition def : cards)
             counts.merge(def.suit(), 1, Integer::sum);
 
-        // Map to DTOs
-        List<SuitCountDto> result = new ArrayList<>(counts.size());
-        for (var entry : counts.entrySet())
-            result.add(new SuitCountDto(entry.getKey().toString(), entry.getValue()));
+        // Build result including all suits, even those not present
+        List<SuitCountDto> result = new ArrayList<>(Suit.values().length);
+        for (Suit suit : Suit.values())
+        {
+            int count = counts.getOrDefault(suit, 0);
+            result.add(new SuitCountDto(suit.toString(), count));
+        }
 
         return result;
     }
 
     public List<CardCountDto> getRemainingCardsBySuitAndRank(UUID gameId) throws GameDoesNotExistException
     {
-        if (!_gameRepo.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
+        if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
 
-        var cards = _gameRepo.getShoeCards(gameId);
-        if (cards.isEmpty()) return List.of(); // TODO?
+        var cards = gameRepository.getShoeCards(gameId);
 
         // Count remaining cards grouped by (suit, rank)
         Map<String, Long> counts = cards.stream()
@@ -137,19 +148,21 @@ public class GameService
                         Collectors.counting()
                 ));
 
-        // Convert to DTOs
-        List<CardCountDto> result = new ArrayList<>();
-        for (var entry : counts.entrySet())
+        // Build result with every suit/rank combination explicitly present
+        List<CardCountDto> result = new ArrayList<>(Suit.values().length * Rank.values().length);
+        for (Suit suit : Suit.values())
         {
-            var parts = entry.getKey().split(":");
-            int suit = Integer.parseInt(parts[0]);
-            int rank = Integer.parseInt(parts[1]);
-            result.add(new CardCountDto(suit, rank, entry.getValue().intValue()));
+            for (Rank rank : Rank.values())
+            {
+                String key = suit.ordinal() + ":" + rank.ordinal();
+                int count = counts.getOrDefault(key, 0L).intValue();
+                result.add(new CardCountDto(suit.ordinal(), rank.ordinal(), count));
+            }
         }
 
         // Sort: Hearts, Spades, Clubs, Diamonds then K → Q → J → 10 → ... → 2 → A
         result.sort(Comparator
-                .comparingInt((CardCountDto c) -> c.suit() + 1)
+                .comparingInt(CardCountDto::suit)
                 .thenComparingInt(c -> 14 - c.rank()));
 
         return result;
@@ -158,10 +171,10 @@ public class GameService
     @Transactional
     public UUID createDeck(String name)
     {
-        UUID deckId = _deckRepo.createDeck(name);
+        UUID deckId = deckRepository.createDeck(name);
 
-        for (var cardDefinition : _cardRepo.getAll())
-            _deckRepo.addCardToDeck(deckId, cardDefinition.id());
+        for (var cardDefinition : cardRepository.getAll())
+            deckRepository.addCardToDeck(deckId, cardDefinition.id());
 
         return deckId;
     }
@@ -170,26 +183,26 @@ public class GameService
     @Transactional
     public void addDeckToGame(UUID gameId, UUID deckId) throws CardsExceptionBase
     {
-        if (!_gameRepo.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
-        if (!_deckRepo.doesDeckExist(deckId)) throw new DeckDoesNotExistException(deckId);
+        if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
+        if (!deckRepository.doesDeckExist(deckId)) throw new DeckDoesNotExistException(deckId);
 
-        var cards = _deckRepo.getCardsInDeck(deckId);
+        var cards = deckRepository.getCardsInDeck(deckId);
         if (cards.isEmpty()) throw new EmptyDeckException(deckId);
 
         for (DeckCardEntity card : cards)
-            _gameRepo.pushbackCardToShoe(gameId, card.id());
+            gameRepository.pushbackCardToShoe(gameId, card.id());
     }
 
     public List<CardDefinition> getPlayerHand(UUID playerId) throws CardsExceptionBase
     {
-        if (!_playerRepo.doesPlayerExist(playerId)) throw new PlayerDoesNotExistException(playerId);
-        return _playerRepo.getHandForPlayer(playerId);
+        if (!playerRepository.doesPlayerExist(playerId)) throw new PlayerDoesNotExistException(playerId);
+        return playerRepository.getHandForPlayer(playerId);
     }
 
     @Transactional
     public void shuffleShoeForGame(UUID gameId) throws GameDoesNotExistException
     {
-        if (!_gameRepo.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
-        _gameRepo.shuffleShoe(gameId);
+        if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
+        gameRepository.shuffleShoe(gameId);
     }
 }

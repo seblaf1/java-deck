@@ -1,9 +1,6 @@
 package com.deck.server.repositories;
 
-import com.deck.server.entity.CardDefinition;
-import com.deck.server.entity.DeckCardEntity;
-import com.deck.server.entity.Rank;
-import com.deck.server.entity.Suit;
+import com.deck.server.entity.*;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +35,21 @@ public class GameRepository implements IGameRepository
     {
         return db.sql("SELECT 1 FROM game WHERE id=:id")
                 .param("id", gameId).query(Integer.class).optional().isPresent();
+    }
+
+    @Override
+    public List<GameEntity> getAll()
+    {
+        return db.sql("""
+            SELECT id, created_at
+            FROM game
+            ORDER BY created_at DESC
+            """)
+                .query((rs, rowNum) -> new GameEntity(
+                        rs.getObject("id", UUID.class),
+                        rs.getObject("created_at", java.time.OffsetDateTime.class)
+                ))
+                .list();
     }
 
     @Override

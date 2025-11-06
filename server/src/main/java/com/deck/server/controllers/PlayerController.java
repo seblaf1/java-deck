@@ -15,19 +15,87 @@ import java.util.*;
 @RequestMapping("/players")
 public class PlayerController
 {
-    private final PlayerService _playerService;
+    private final PlayerService playerService;
+    private final GameService gameService;
 
-    public PlayerController(GameService games, PlayerService playerService)
+    public PlayerController(PlayerService playerService, GameService gameService)
     {
-        _playerService = playerService;
+        this.playerService = playerService;
+        this.gameService = gameService;
     }
 
+    /**
+     * Create a new user (player) by name.
+     */
+    @PostMapping
+    public ResponseEntity<UUID> createUser(@RequestParam String name)
+    {
+        try
+        {
+            UUID userId = playerService.createUser(name);
+            return ResponseEntity.ok().body(userId);
+        }
+        catch (CardsExceptionBase ex)
+        {
+            throw new ResponseStatusException(ex.code, ex.getMessage());
+        }
+        catch (Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        }
+    }
+
+    /**
+     * Add a user as a player in a specific game.
+     */
+    @PostMapping("/{userId}/join/{gameId}")
+    public ResponseEntity<UUID> addPlayerToGame(@PathVariable UUID userId, @PathVariable UUID gameId)
+    {
+        try
+        {
+            UUID playerId = gameService.addPlayerToGame(gameId, userId);
+            return ResponseEntity.ok().body(playerId);
+        }
+        catch (CardsExceptionBase ex)
+        {
+            throw new ResponseStatusException(ex.code, ex.getMessage());
+        }
+        catch (Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        }
+    }
+
+    /**
+     * Remove a player from their game.
+     */
+    @DeleteMapping("/{playerId}/leave")
+    public ResponseEntity<Void> removePlayer(@PathVariable UUID playerId)
+    {
+        try
+        {
+            gameService.removePlayer(playerId);
+            return ResponseEntity.ok().build();
+        }
+        catch (CardsExceptionBase ex)
+        {
+            throw new ResponseStatusException(ex.code, ex.getMessage());
+        }
+        catch (Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        }
+    }
+
+    /**
+     * Get the list of cards for a player
+     */
     @GetMapping("/{playerId}/hand")
     public ResponseEntity<List<CardDto>> getListOfCardsForPlayer(@PathVariable UUID playerId)
     {
         try
         {
-            var cards = _playerService.getCardsForPlayer(playerId);
+            var cards = playerService.getCardsForPlayer(playerId);
             return ResponseEntity.ok(cards);
         }
         catch (CardsExceptionBase ex)

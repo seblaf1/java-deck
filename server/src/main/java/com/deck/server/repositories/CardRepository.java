@@ -6,7 +6,6 @@ import com.deck.server.entity.Suit;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Repository
 public class CardRepository implements ICardRepository

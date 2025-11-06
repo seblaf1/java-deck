@@ -1,6 +1,7 @@
 package com.deck.server.controllers;
 
 import com.deck.server.dto.CardCountDto;
+import com.deck.server.dto.GameDto;
 import com.deck.server.dto.PlayerDto;
 import com.deck.server.dto.SuitCountDto;
 import com.deck.server.exceptions.CardsExceptionBase;
@@ -17,19 +18,22 @@ import java.util.UUID;
 @RequestMapping("/games")
 public class GameController
 {
-    private final GameService _gameService;
+    private final GameService gameService;
 
-    public GameController(GameService games)
+    public GameController(GameService gameService)
     {
-        this._gameService = games;
+        this.gameService = gameService;
     }
 
+    /**
+     * Create a game
+     */
     @PostMapping
     public ResponseEntity<UUID> createGame()
     {
         try
         {
-            UUID gameId = _gameService.createGame();
+            UUID gameId = gameService.createGame();
             return ResponseEntity.ok(gameId);
         }
         catch (CardsExceptionBase ex)
@@ -42,12 +46,15 @@ public class GameController
         }
     }
 
+    /**
+     * Delete a game
+     */
     @DeleteMapping("/{gameId}")
     public ResponseEntity<Void> deleteGame(@PathVariable UUID gameId)
     {
         try
         {
-            _gameService.deleteGame(gameId);
+            gameService.deleteGame(gameId);
             return ResponseEntity.ok().build();
         }
         catch (CardsExceptionBase ex)
@@ -60,12 +67,32 @@ public class GameController
         }
     }
 
+    /**
+     * List all games.
+     */
+    @GetMapping
+    public ResponseEntity<List<GameDto>> listGames()
+    {
+        try
+        {
+            var games = gameService.getAllGames();
+            return ResponseEntity.ok(games);
+        }
+        catch (Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        }
+    }
+
+    /**
+     * Add a deck to the game deck (shoe).
+     */
     @PostMapping("/{gameId}/decks/{deckId}")
     public ResponseEntity<Void> addDeckToGame(@PathVariable UUID gameId, @PathVariable UUID deckId)
     {
         try
         {
-            _gameService.addDeckToGame(gameId, deckId);
+            gameService.addDeckToGame(gameId, deckId);
             return ResponseEntity.ok().build();
         }
         catch (CardsExceptionBase ex)
@@ -78,15 +105,19 @@ public class GameController
         }
     }
 
+    /**
+     * Deal cards to a player in a game from the game deck
+     */
     @PostMapping("/{gameId}/players/{playerId}/deal")
-    public void dealCardsToPlayer(
+    public ResponseEntity<Void> dealCardsToPlayer(
             @PathVariable UUID gameId,
             @PathVariable UUID playerId,
             @RequestParam(defaultValue = "1") int count)
     {
         try
         {
-            _gameService.dealCardsToPlayer(gameId, playerId, count);
+            gameService.dealCardsToPlayer(gameId, playerId, count);
+            return ResponseEntity.ok().build();
         }
         catch (CardsExceptionBase ex)
         {
@@ -98,12 +129,15 @@ public class GameController
         }
     }
 
+    /**
+     * Get the list of players in a game along with the total added value of all the cards each player holds
+     */
     @GetMapping("/{gameId}/players")
     public ResponseEntity<List<PlayerDto>> getPlayers(@PathVariable UUID gameId)
     {
         try
         {
-            var players = _gameService.getPlayersInGame(gameId);
+            var players = gameService.getPlayersInGame(gameId);
             return ResponseEntity.ok(players);
         }
         catch (CardsExceptionBase ex)
@@ -125,7 +159,7 @@ public class GameController
     {
         try
         {
-            var response = _gameService.getRemainingCardsBySuit(gameId);
+            var response = gameService.getRemainingCardsBySuit(gameId);
             return ResponseEntity.ok(response);
         }
         catch (CardsExceptionBase ex)
@@ -138,12 +172,15 @@ public class GameController
         }
     }
 
+    /**
+     * Get the count of each card (suit and value) remaining in the game deck sorted by suit
+     */
     @GetMapping("/{gameId}/remaining-by-suit-rank")
     public ResponseEntity<List<CardCountDto>> getRemainingCardsBySuitAndRank(@PathVariable UUID gameId)
     {
         try
         {
-            var result = _gameService.getRemainingCardsBySuitAndRank(gameId);
+            var result = gameService.getRemainingCardsBySuitAndRank(gameId);
             return ResponseEntity.ok(result);
         }
         catch (CardsExceptionBase ex)
@@ -157,12 +194,16 @@ public class GameController
         }
     }
 
+    /**
+     * Shuffle the game deck (shoe)
+     */
     @PostMapping("/{gameId}/shuffle")
-    public void shuffleShoe(@PathVariable UUID gameId)
+    public ResponseEntity<Void> shuffleShoe(@PathVariable UUID gameId)
     {
         try
         {
-            _gameService.shuffleShoeForGame(gameId);
+            gameService.shuffleShoeForGame(gameId);
+            return ResponseEntity.ok().build();
         }
         catch (CardsExceptionBase ex)
         {
