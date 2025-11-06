@@ -51,12 +51,12 @@ CREATE TABLE IF NOT EXISTS deck (
 --
 -- NOTE 2:
 -- We provide an id to the association table so that we can reference via id instead of a composite
--- (deck, card) primary key. This reduces bloating and increases performance.
+-- (deck, card) primary key. This reduces bloating and increases performance. Also allows for duplicates extension.
 CREATE TABLE IF NOT EXISTS deck_card (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     deck_id     UUID NOT NULL REFERENCES deck(id) ON DELETE CASCADE,
-    card_def_id SMALLINT NOT NULL REFERENCES card_definition(id),
-    CONSTRAINT uq_card_per_deck UNIQUE (deck_id, card_def_id)
+    card_def_id SMALLINT NOT NULL REFERENCES card_definition(id)
+    --CONSTRAINT uq_card_per_deck UNIQUE (deck_id, card_def_id) <---- removed to allow deck customization (duplicates)
 );
 
 

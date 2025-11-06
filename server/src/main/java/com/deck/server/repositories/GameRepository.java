@@ -23,7 +23,7 @@ public class GameRepository
         db.sql("DELETE FROM game WHERE id=:id").param("id", gameId).update();
     }
 
-    public boolean gameExists(UUID gameId)
+    public boolean doesGameExist(UUID gameId)
     {
         return db.sql("SELECT 1 FROM game WHERE id=:id")
                 .param("id", gameId).query(Integer.class).optional().isPresent();
