@@ -24,13 +24,14 @@ public class PlayerService
     }
 
     /**
-     * Creates a new user and returns its ID.
+     * Creates a new user and returns its ID, if it doesn't already exist.
      * If a user with the same name already exists, throws a UserAlreadyExistsException.
      */
     @Transactional
     public UUID createUser(String name) throws UserAlreadyExistsException
     {
-        if (userRepository.getUserByName(name).isPresent()) throw new UserAlreadyExistsException(name);
+        var user = userRepository.getUserByName(name);
+        if (user.isPresent()) return user.get().id();
 
         UUID id = UUID.randomUUID();
         return userRepository.createUser(name, id);

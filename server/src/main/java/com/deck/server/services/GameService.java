@@ -7,6 +7,7 @@ import com.deck.server.dto.PlayerDto;
 import com.deck.server.dto.SuitCountDto;
 import com.deck.server.exceptions.*;
 import com.deck.server.repositories.*;
+import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
@@ -32,6 +33,12 @@ public class GameService
         this.playerRepository = playerRepository;
         this.gameRepository = gameRepository;
         this.userRepository = userRepository;
+    }
+
+    @PostConstruct
+    public void init()
+    {
+        cardRepository.populateAll();
     }
 
     public List<GameDto> getAllGames()
@@ -61,9 +68,14 @@ public class GameService
     public UUID addPlayerToGame(UUID gameId, UUID userId) throws CardsExceptionBase
     {
         if (!gameRepository.doesGameExist(gameId)) throw new GameDoesNotExistException(gameId);
+        if (!userRepository.doesUserExist(userId)) throw new UserDoesNotExistException(userId);
 
-        if (!userRepository.doesUserExist(userId))
-            userRepository.createUser("placeholder name", userId);
+       if (playerRepository
+               .getAllPlayersInGame(gameId).stream()
+               .anyMatch(p -> p.userId().equals(userId)))
+       {
+           throw new UserAlreadyInGameException(userId, gameId);
+       }
 
         return playerRepository.addPlayerToGame(gameId, userId);
     }

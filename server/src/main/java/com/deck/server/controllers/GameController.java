@@ -6,6 +6,7 @@ import com.deck.server.dto.PlayerDto;
 import com.deck.server.dto.SuitCountDto;
 import com.deck.server.exceptions.CardsExceptionBase;
 import com.deck.server.services.GameService;
+import com.deck.server.services.PlayerService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,10 +20,12 @@ import java.util.UUID;
 public class GameController
 {
     private final GameService gameService;
+    private final PlayerService playerService;
 
-    public GameController(GameService gameService)
+    public GameController(GameService gameService, PlayerService playerService)
     {
         this.gameService = gameService;
+        this.playerService = playerService;
     }
 
     /**
@@ -85,6 +88,23 @@ public class GameController
     }
 
     /**
+     * Creates a new deck.
+     */
+    @PostMapping("/new-deck")
+    public ResponseEntity<UUID> createDeck()
+    {
+        try
+        {
+            var deckId = gameService.createDeck("deck name placeholder");
+            return ResponseEntity.ok(deckId);
+        }
+        catch (Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        }
+    }
+
+    /**
      * Add a deck to the game deck (shoe).
      */
     @PostMapping("/{gameId}/decks/{deckId}")
@@ -95,6 +115,29 @@ public class GameController
             gameService.addDeckToGame(gameId, deckId);
             return ResponseEntity.ok().build();
         }
+        catch (CardsExceptionBase ex)
+        {
+            throw new ResponseStatusException(ex.code, ex.getMessage());
+        }
+        catch (Exception ex)
+        {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        }
+    }
+
+    /**
+     * Add a user as a player in a specific game.
+     */
+    @PostMapping("/{gameId}/join")
+    public ResponseEntity<UUID> addPlayerToGame(@RequestParam String playerName, @PathVariable UUID gameId)
+    {
+        try
+        {
+            UUID userId = playerService.createUser(playerName);
+            UUID playerId = gameService.addPlayerToGame(gameId, userId);
+            return ResponseEntity.ok().body(playerId);
+        }
+
         catch (CardsExceptionBase ex)
         {
             throw new ResponseStatusException(ex.code, ex.getMessage());

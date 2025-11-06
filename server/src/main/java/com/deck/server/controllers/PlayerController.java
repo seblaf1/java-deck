@@ -46,27 +46,6 @@ public class PlayerController
     }
 
     /**
-     * Add a user as a player in a specific game.
-     */
-    @PostMapping("/{userId}/join/{gameId}")
-    public ResponseEntity<UUID> addPlayerToGame(@PathVariable UUID userId, @PathVariable UUID gameId)
-    {
-        try
-        {
-            UUID playerId = gameService.addPlayerToGame(gameId, userId);
-            return ResponseEntity.ok().body(playerId);
-        }
-        catch (CardsExceptionBase ex)
-        {
-            throw new ResponseStatusException(ex.code, ex.getMessage());
-        }
-        catch (Exception ex)
-        {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
-        }
-    }
-
-    /**
      * Remove a player from their game.
      */
     @DeleteMapping("/{playerId}/leave")
