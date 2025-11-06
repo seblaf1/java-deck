@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class CardDefinitionRepositoryTest
 {
-    @Autowired private CardDefinitionRepository cards;
+    @Autowired private CardRepository cards;
 
     @Test
     void populateAndReadCards()

@@ -6,13 +6,15 @@ import com.deck.server.entity.Suit;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Repository
-public class CardDefinitionRepository
+public class CardRepository implements ICardRepository
 {
     private final JdbcClient db;
-    public CardDefinitionRepository(JdbcClient db) { this.db = db; }
+    public CardRepository(JdbcClient db) { this.db = db; }
 
+    @Override
     public void populateAll()
     {
         for (Suit suit : Suit.values())
@@ -31,6 +33,7 @@ public class CardDefinitionRepository
         }
     }
 
+    @Override
     public List<CardDefinition> getAll()
     {
         return db.sql("SELECT id, suit, rank FROM card_definition ORDER BY suit, rank")
@@ -42,6 +45,7 @@ public class CardDefinitionRepository
                 .list();
     }
 
+    @Override
     public Optional<CardDefinition> getById(short id)
     {
         return db.sql("SELECT id, suit, rank FROM card_definition WHERE id=:id")
@@ -52,5 +56,25 @@ public class CardDefinitionRepository
                         Rank.fromShort(rs.getShort("rank"))
                 ))
                 .optional();
+    }
+
+    @Override
+    public List<CardDefinition> getManyById(List<Short> ids)
+    {
+        if (ids == null || ids.isEmpty())
+            return Collections.emptyList();
+
+        return db.sql("""
+            SELECT id, suit, rank
+            FROM card_definition
+            WHERE id IN (:ids)
+            """)
+                .param("ids", ids)
+                .query((rs, rowNum) -> new CardDefinition(
+                        rs.getShort("id"),
+                        Suit.fromShort(rs.getShort("suit")),
+                        Rank.fromShort(rs.getShort("rank"))
+                ))
+                .list();
     }
 }

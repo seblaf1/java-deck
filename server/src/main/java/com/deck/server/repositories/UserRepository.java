@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.*;
 
 @Repository
-public class UserRepository
+public class UserRepository implements IUserRepository
 {
     private final JdbcClient db;
 
@@ -16,6 +16,7 @@ public class UserRepository
         this.db = db;
     }
 
+    @Override
     public UUID createUser(String name)
     {
         UUID id = UUID.randomUUID();
@@ -26,6 +27,7 @@ public class UserRepository
         return id;
     }
 
+    @Override
     public Optional<User> getUserByName(String name)
     {
         return db.sql("SELECT id, name, created_at FROM app_user WHERE name = :name")
@@ -38,6 +40,7 @@ public class UserRepository
                 .optional();
     }
 
+    @Override
     public boolean doesUserExist(UUID userId)
     {
         return db.sql("SELECT 1 FROM app_user WHERE id = :id")
@@ -47,6 +50,7 @@ public class UserRepository
                 .isPresent();
     }
 
+    @Override
     public void deleteUser(UUID userId)
     {
         db.sql("DELETE FROM app_user WHERE id = :id")
@@ -54,6 +58,7 @@ public class UserRepository
                 .update();
     }
 
+    @Override
     public List<User> getAllUsers()
     {
         return db.sql("SELECT id, name, created_at FROM app_user ORDER BY created_at")

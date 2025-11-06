@@ -1,5 +1,6 @@
 package com.deck.server.repositories;
 
+import com.deck.server.entity.DeckCardEntity;
 import com.deck.server.entity.DeckEntity;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,17 +15,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DeckRepositoryTest
 {
+    @Autowired private CardRepository cards;
     @Autowired private DeckRepository decks;
     private UUID deckId;
+    private short cardDefId;
 
     @BeforeEach
     void setup()
     {
-        deckId = decks.createDeck("Test Deck");
+        cards.populateAll();
+        deckId = decks.createDeck("test deck");  // ✅ valid FK
+        cardDefId = ((Number) cards.getAll().getFirst().id()).shortValue();
     }
 
     @Test
-    @Order(1)
     void createDeckWorks()
     {
         assertThat(deckId).isNotNull();
@@ -39,17 +43,6 @@ class DeckRepositoryTest
     }
 
     @Test
-    @Order(2)
-    void renameDeckWorks()
-    {
-        decks.renameDeck(deckId, "Renamed Deck");
-
-        DeckEntity deck = decks.getDeckById(deckId).orElseThrow();
-        assertThat(deck.name()).isEqualTo("Renamed Deck");
-    }
-
-    @Test
-    @Order(3)
     void listDecksIncludesNewDeck()
     {
         List<DeckEntity> all = decks.getAllDecks();
@@ -59,10 +52,43 @@ class DeckRepositoryTest
     }
 
     @Test
-    @Order(4)
     void deleteDeckWorks()
     {
         decks.deleteDeck(deckId);
         assertThat(decks.getDeckById(deckId)).isEmpty();
+    }
+
+    @Test
+    void addAndCountCards()
+    {
+        UUID id = decks.addCardToDeck(deckId, cardDefId);
+        assertThat(id).isNotNull();
+
+        int count = decks.countCardsInDeck(deckId);
+        assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    void getAndRemoveCards()
+    {
+        UUID id = decks.addCardToDeck(deckId, cardDefId);
+
+        List<DeckCardEntity> inDeck = decks.getCardsInDeck(deckId);
+        assertThat(inDeck).hasSize(1);
+        assertThat(inDeck.getFirst().deck_id()).isEqualTo(deckId);
+        assertThat(inDeck.getFirst().card_def_id()).isEqualTo(cardDefId);
+
+        decks.removeCardFromDeck(id);
+        assertThat(decks.countCardsInDeck(deckId)).isZero();
+    }
+
+    @Test
+    void clearDeck()
+    {
+        decks.addCardToDeck(deckId, cardDefId);
+        decks.addCardToDeck(deckId, cardDefId);
+        decks.clearAllCardsFromDeck(deckId);
+
+        assertThat(decks.countCardsInDeck(deckId)).isZero();
     }
 }

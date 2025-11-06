@@ -19,6 +19,12 @@ public enum Suit
         return code;
     }
 
+    @Override
+    public String toString()
+    {
+        return this.name();
+    }
+
     public static Suit fromShort(short code)
     {
         for (Suit suit : values())

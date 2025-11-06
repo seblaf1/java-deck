@@ -1,13 +1,12 @@
 package com.deck.server.repositories;
 
-import com.deck.server.entity.PlayerEntity;
+import com.deck.server.entity.*;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
-
 import java.util.*;
 
 @Repository
-public class PlayerRepository
+public class PlayerRepository implements IPlayerRepository
 {
     private final JdbcClient db;
 
@@ -16,6 +15,7 @@ public class PlayerRepository
         this.db = db;
     }
 
+    @Override
     public UUID addPlayerToGame(UUID gameId, UUID userId)
     {
         UUID id = UUID.randomUUID();
@@ -31,6 +31,7 @@ public class PlayerRepository
         return id;
     }
 
+    @Override
     public void removePlayerFromGame(UUID playerId)
     {
         db.sql("DELETE FROM player WHERE id = :id")
@@ -38,6 +39,7 @@ public class PlayerRepository
                 .update();
     }
 
+    @Override
     public List<PlayerEntity> getAllPlayersInGame(UUID gameId)
     {
         return db.sql("""
@@ -58,6 +60,7 @@ public class PlayerRepository
                 .list();
     }
 
+    @Override
     public boolean doesPlayerExist(UUID playerId)
     {
         return db.sql("SELECT 1 FROM player WHERE id = :id")
@@ -65,5 +68,54 @@ public class PlayerRepository
                 .query(Integer.class)
                 .optional()
                 .isPresent();
+    }
+
+    @Override
+    public List<CardDefinition> getHandForPlayer(UUID playerId)
+    {
+        return db.sql("""
+            SELECT def.id, def.suit, def.rank
+            FROM hand_card h
+            JOIN deck_card d ON d.id = h.card_id
+            JOIN card_definition def ON def.id = d.card_def_id
+            WHERE h.player_id = ?
+            ORDER BY h.hand_order
+       """)
+                .param(playerId)
+                .query((rs, rowNum) -> new CardDefinition(
+                        rs.getShort("id"),
+                        Suit.fromShort(rs.getShort("suit")),
+                        Rank.fromShort(rs.getShort("rank"))
+                ))
+                .list();
+    }
+
+    @Override
+    public void addCardsToPlayerHand(UUID playerId, List<DeckCardEntity> cards)
+    {
+        if (cards == null || cards.isEmpty())
+            return;
+
+        int order = db.sql("""
+            SELECT COALESCE(MAX(hand_order) + 1, 1)
+            FROM hand_card
+            WHERE player_id = :playerId
+        """)
+                .param("playerId", playerId)
+                .query(Integer.class)
+                .optional()
+                .orElse(1);
+
+        for (DeckCardEntity card : cards)
+        {
+            db.sql("""
+                INSERT INTO hand_card (player_id, card_id, hand_order)
+                VALUES (:playerId, :cardId, :handOrder)
+            """)
+                    .param("playerId", playerId)
+                    .param("cardId", card.id())
+                    .param("handOrder", order++)
+                    .update();
+        }
     }
 }

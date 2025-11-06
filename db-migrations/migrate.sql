@@ -62,12 +62,11 @@ CREATE TABLE IF NOT EXISTS deck_card (
 
 -- === SHOE (UNDEALT CARDS ONLY) ===
 CREATE TABLE IF NOT EXISTS shoe_card (
-    id          BIGSERIAL PRIMARY KEY,
     game_id     UUID NOT NULL REFERENCES game(id) ON DELETE CASCADE,
     card_id     UUID NOT NULL REFERENCES deck_card(id) ON DELETE RESTRICT,
     order_key   BIGINT NOT NULL,  -- Fisher–Yates order for undealt cards
-    CONSTRAINT uq_shoe_card_per_game UNIQUE (game_id, card_id),
-    CONSTRAINT uq_shoe_order UNIQUE (game_id, order_key)
+    CONSTRAINT pk_shoe_card PRIMARY KEY (game_id, card_id),
+    CONSTRAINT uq_shoe_order UNIQUE (game_id, order_key) DEFERRABLE INITIALLY DEFERRED
 );
 
 

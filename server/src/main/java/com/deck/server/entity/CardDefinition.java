@@ -1,6 +1,6 @@
 package com.deck.server.entity;
 
-public record CardDefinition(short id, Suit suit, Rank  rank)
+public record CardDefinition(short id, Suit suit, Rank rank)
 {
     @Override
     public String toString()
